@@ -105,9 +105,16 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
             throw new ScriptException("cannot initialize " + SCRIPT_NAME + ": index and vector array must have same length!");
         }
         if (cosine) {
+            float average = 0f;
+            for (double v : vector) {
+                average += v;
+            }
+
+            average /= vector.size();
+
             // compute query vector norm once
             for (double v: vector) {
-                queryVectorNorm += Math.pow(v, 2.0);
+                queryVectorNorm += Math.pow(v - average, 2.0);
             }
         }
     }
@@ -118,8 +125,22 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
         float dotProduct = 0;
         double docVectorNorm = 0.0f;
 
-        // first, get the ShardTerms object for the field.
         IndexField indexField = this.indexLookup().get(field);
+
+        float average = 0f;
+        for (String value : index) {
+            IndexFieldTerm indexTermField = indexField.get(value, IndexLookup.FLAG_PAYLOADS);
+            if (indexTermField != null) {
+                Iterator<TermPosition> iter = indexTermField.iterator();
+                if (iter.hasNext()) {
+                    average += iter.next().payloadAsFloat(0f);
+                }
+            }
+        }
+
+        average /= index.size();
+
+        // first, get the ShardTerms object for the field.
         for (int i = 0; i < index.size(); i++) {
 
             // get the vector value stored in the term payload
@@ -129,7 +150,7 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
                 Iterator<TermPosition> iter = indexTermField.iterator();
                 if (iter.hasNext()) {
 
-                    docVector = iter.next().payloadAsFloat(0f);
+                    docVector = iter.next().payloadAsFloat(0f) - average;
                     docVectorNorm += Math.pow(docVector, 2.0);
                 }
             }
