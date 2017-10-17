@@ -114,34 +114,36 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
 
     @Override
     public Object run() {
-        float score = 0;
+
+        float dotProduct = 0;
+        double docVectorNorm = 0.0f;
+
         // first, get the ShardTerms object for the field.
         IndexField indexField = this.indexLookup().get(field);
-        double docVectorNorm = 0.0f;
         for (int i = 0; i < index.size(); i++) {
+
             // get the vector value stored in the term payload
             IndexFieldTerm indexTermField = indexField.get(index.get(i), IndexLookup.FLAG_PAYLOADS);
-            float payload = 0f;
+            float docVector = 0f;
             if (indexTermField != null) {
                 Iterator<TermPosition> iter = indexTermField.iterator();
                 if (iter.hasNext()) {
-                    payload = iter.next().payloadAsFloat(0f);
-                    if (cosine) {
-                        // doc vector norm
-                        docVectorNorm += Math.pow(payload, 2.0);
-                    }
+
+                    docVector = iter.next().payloadAsFloat(0f);
+                    docVectorNorm += Math.pow(docVector, 2.0);
                 }
             }
             // dot product
-            score += payload * vector.get(i);
+            dotProduct += docVector * vector.get(i);
         }
-        if (cosine) {
-            // cosine similarity score
-            if (docVectorNorm == 0 || queryVectorNorm == 0) return 0f;
-            return score / (Math.sqrt(docVectorNorm) * Math.sqrt(queryVectorNorm));
+
+        // cosine similarity score
+        if (docVectorNorm == 0 || queryVectorNorm == 0) {
+
+            return 0f;
         } else {
-            // dot product score
-            return score;
+
+            return dotProduct / (Math.sqrt(docVectorNorm) * Math.sqrt(queryVectorNorm));
         }
     }
 
