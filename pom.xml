@@ -7,13 +7,13 @@
     <parent>
         <groupId>org.elasticsearch.plugin</groupId>
         <artifactId>plugins</artifactId>
-        <version>2.4.6</version>
+        <version>2.4.5</version>
     </parent>
 
     <name>elasticsearch-vector-scoring</name>
     <groupId>com.github.mlnick</groupId>
     <artifactId>elasticsearch-vector-scoring</artifactId>
-    <version>2.4.6</version>
+    <version>2.4.5</version>
     <description>ElasticSearch Plugin for Vector Scoring</description>
 
     <licenses>
