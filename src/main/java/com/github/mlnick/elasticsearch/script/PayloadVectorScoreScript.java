@@ -14,21 +14,20 @@
 
 package com.github.mlnick.elasticsearch.script;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
-import org.elasticsearch.script.ScriptException;
-
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.script.AbstractSearchScript;
 import org.elasticsearch.script.ExecutableScript;
 import org.elasticsearch.script.NativeScriptFactory;
+import org.elasticsearch.script.ScriptException;
 import org.elasticsearch.search.lookup.IndexField;
 import org.elasticsearch.search.lookup.IndexFieldTerm;
 import org.elasticsearch.search.lookup.IndexLookup;
 import org.elasticsearch.search.lookup.TermPosition;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Script that scores documents based on term vector payloads. Dot product and cosine similarity
@@ -41,10 +40,11 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
     // indices for the query vector
     List<String> index = null;
     // vector for the query vector
-    List<Double> vector = null;
+    List<Double> queryVector = null;
     // whether to score cosine similarity (true) or dot product (false)
     boolean cosine = false;
     double queryVectorNorm = 0;
+    float queryVectorAvg = 0;
 
     final static public String SCRIPT_NAME = "payload_vector_score";
 
@@ -87,75 +87,76 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
         // get field to score
         field = (String) params.get("field");
         // get query vector
-        vector = (List<Double>) params.get("vector");
+        queryVector = (List<Double>) params.get("vector");
         // cosine flag
         Object cosineParam = params.get("cosine");
         if (cosineParam != null) {
             cosine = (boolean) cosineParam;
         }
-        if (field == null || vector == null) {
+        if (field == null || queryVector == null) {
             throw new ScriptException("cannot initialize " + SCRIPT_NAME + ": field or vector parameter missing!");
         }
         // init index
-        index = new ArrayList<>(vector.size());
-        for (int i = 0; i < vector.size(); i++) {
+        index = new ArrayList<>(queryVector.size());
+        for (int i = 0; i < queryVector.size(); i++) {
             index.add(String.valueOf(i));
         }
-        if (vector.size() != index.size()) {
+        if (queryVector.size() != index.size()) {
             throw new ScriptException("cannot initialize " + SCRIPT_NAME + ": index and vector array must have same length!");
         }
-        if (cosine) {
-            float average = 0f;
-            for (double v : vector) {
-                average += v;
-            }
 
-            average /= vector.size();
-
-            // compute query vector norm once
-            for (double v: vector) {
-                queryVectorNorm += Math.pow(v - average, 2.0);
-            }
+        float queryVectorTotal = 0f;
+        for (double v : queryVector) {
+            queryVectorTotal += v;
         }
+        queryVectorAvg = queryVectorTotal / queryVector.size();
+
+        // compute query vector norm once
+        for (double v : queryVector) {
+            queryVectorNorm += Math.pow(v - queryVectorAvg, 2.0);
+        }
+
     }
 
     @Override
     public Object run() {
 
-        float dotProduct = 0;
-        double docVectorNorm = 0.0f;
-
         IndexField indexField = this.indexLookup().get(field);
-
-        float average = 0f;
-        for (String value : index) {
-            IndexFieldTerm indexTermField = indexField.get(value, IndexLookup.FLAG_PAYLOADS);
+        List<Float> docVector = new ArrayList<>();
+        // first, get the ShardTerms object for the field.
+        for (int i = 0; i < index.size(); i++) {
+            IndexFieldTerm indexTermField = indexField.get(index.get(i), IndexLookup.FLAG_PAYLOADS);
             if (indexTermField != null) {
                 Iterator<TermPosition> iter = indexTermField.iterator();
                 if (iter.hasNext()) {
-                    average += iter.next().payloadAsFloat(0f);
+                    docVector.add(iter.next().payloadAsFloat(0f));
                 }
             }
         }
 
-        average /= index.size();
+        if (docVector.isEmpty()) {
+            return 0f;
+        }
 
-        // first, get the ShardTerms object for the field.
+        if (docVector.size() != index.size()) {
+            return 0f;
+        }
+
+        float docVectorAvg = 0f;
         for (int i = 0; i < index.size(); i++) {
+            docVectorAvg += docVector.get(i);
+        }
+        docVectorAvg /= docVector.size();
 
-            // get the vector value stored in the term payload
-            IndexFieldTerm indexTermField = indexField.get(index.get(i), IndexLookup.FLAG_PAYLOADS);
-            float docVector = 0f;
-            if (indexTermField != null) {
-                Iterator<TermPosition> iter = indexTermField.iterator();
-                if (iter.hasNext()) {
+        float docVectorValue;
+        float dotProduct = 0;
+        double docVectorNorm = 0.0f;
+        for (int i = 0; i < index.size(); i++) {
+            docVectorValue = docVector.get(i) - docVectorAvg;
+            docVectorNorm += Math.pow(docVectorValue, 2.0);
 
-                    docVector = iter.next().payloadAsFloat(0f) - average;
-                    docVectorNorm += Math.pow(docVector, 2.0);
-                }
-            }
             // dot product
-            dotProduct += docVector * vector.get(i);
+            dotProduct += docVectorValue * (queryVector.get(i) - queryVectorAvg);
         }
 
         // cosine similarity score
