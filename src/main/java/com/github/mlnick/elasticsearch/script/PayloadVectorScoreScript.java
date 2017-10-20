@@ -38,7 +38,7 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
     // the field containing the vectors to be scored against
     String field = null;
     // indices for the query vector
-    List<String> index = null;
+    List<Integer> index = null;
     // vector for the query vector
     List<Double> queryVector = null;
     // whether to score cosine similarity (true) or dot product (false)
@@ -88,6 +88,7 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
         field = (String) params.get("field");
         // get query vector
         queryVector = (List<Double>) params.get("vector");
+
         // cosine flag
         Object cosineParam = params.get("cosine");
         if (cosineParam != null) {
@@ -97,35 +98,36 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
             throw new ScriptException("cannot initialize " + SCRIPT_NAME + ": field or vector parameter missing!");
         }
         // init index
-        index = new ArrayList<>(queryVector.size());
+        index = new ArrayList<>();
         for (int i = 0; i < queryVector.size(); i++) {
-            index.add(String.valueOf(i));
-        }
-        if (queryVector.size() != index.size()) {
-            throw new ScriptException("cannot initialize " + SCRIPT_NAME + ": index and vector array must have same length!");
+            if (queryVector.get(i) > 0) {
+                index.add(i);
+            }
         }
 
         float queryVectorTotal = 0f;
-        for (double v : queryVector) {
-            queryVectorTotal += v;
+        for (Integer idx : index) {
+            queryVectorTotal += queryVector.get(idx);
         }
-        queryVectorAvg = queryVectorTotal / queryVector.size();
+        queryVectorAvg = queryVectorTotal / index.size();
 
         // compute query vector norm once
-        for (double v : queryVector) {
-            queryVectorNorm += Math.pow(v - queryVectorAvg, 2.0);
+        for (Integer idx : index) {
+            queryVectorNorm += Math.pow(queryVector.get(idx) - queryVectorAvg, 2.0);
         }
-
     }
 
     @Override
     public Object run() {
 
-        IndexField indexField = this.indexLookup().get(field);
-        List<Float> docVector = new ArrayList<>();
         // first, get the ShardTerms object for the field.
-        for (int i = 0; i < index.size(); i++) {
-            IndexFieldTerm indexTermField = indexField.get(index.get(i), IndexLookup.FLAG_PAYLOADS);
+        IndexField indexField = this.indexLookup().get(field);
+
+        List<Float> docVector = new ArrayList<>();
+        for (Integer idx : index) {
+
+            // get the vector value stored in the term payload
+            IndexFieldTerm indexTermField = indexField.get(String.valueOf(idx), IndexLookup.FLAG_PAYLOADS);
             if (indexTermField != null) {
                 Iterator<TermPosition> iter = indexTermField.iterator();
                 if (iter.hasNext()) {
@@ -143,20 +145,21 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
         }
 
         float docVectorAvg = 0f;
-        for (int i = 0; i < index.size(); i++) {
-            docVectorAvg += docVector.get(i);
+        for (Float v: docVector){
+            docVectorAvg += v;
         }
         docVectorAvg /= docVector.size();
 
         float docVectorValue;
         float dotProduct = 0;
         double docVectorNorm = 0.0f;
-        for (int i = 0; i < index.size(); i++) {
+        for (int i = 0; i < docVector.size(); i++) {
             docVectorValue = docVector.get(i) - docVectorAvg;
             docVectorNorm += Math.pow(docVectorValue, 2.0);
 
             // dot product
-            dotProduct += docVectorValue * (queryVector.get(i) - queryVectorAvg);
+            Integer queryVectorIdx = index.get(i);
+            dotProduct += docVectorValue * (queryVector.get(queryVectorIdx) - queryVectorAvg);
         }
 
         // cosine similarity score
@@ -168,5 +171,4 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
             return dotProduct / (Math.sqrt(docVectorNorm) * Math.sqrt(queryVectorNorm));
         }
     }
-
 }
