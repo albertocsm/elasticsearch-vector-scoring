@@ -1,0 +1,56 @@
+{
+    "analysis": {
+        "filter": {
+            "english_stop": {
+                "type": "stop",
+                "stopwords": "_english_"
+            },
+            "english_keywords": {
+                "type": "keyword_marker",
+                "keywords": ["testkeyword"]
+            },
+            "english_stemmer": {
+                "type": "stemmer",
+                "language": "english"
+            },
+            "english_possessive_stemmer": {
+                "type": "stemmer",
+                "language": "possessive_english"
+            },
+            "modastylz_synonym_filter": {
+                "type": "synonym",
+                "synonyms": [
+                    "t shirt, t-shirt => tshirt"
+                ]
+            }
+        },
+        "analyzer": {
+            "payload_analyzer": {
+                "type": "custom",
+                "tokenizer":"whitespace",
+                "filter":"delimited_payload_filter"
+            }
+        },
+        "analyzer": {
+            "modastylz_english": {
+                "type": "custom",
+                "tokenizer": "whitespace",
+                "filter": [
+                    "english_possessive_stemmer",
+                    "lowercase",
+                    "asciifolding",
+                    "english_stop",
+                    "english_keywords",
+                    "english_stemmer",
+                    "modastylz_synonym_filter",
+                    "word_delimiter"
+                ]
+   		},
+		"case_insensitive": {
+		    "filter": ["lowercase"],
+            "type": "custom",
+			"tokenizer": "keyword"
+        }
+     }
+  }
+}

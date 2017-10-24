@@ -1,0 +1,134 @@
+{
+    "properties": {
+        "actualPrice": {
+            "type": "double"
+        },
+        "avatar2Dready": {
+            "type": "boolean"
+        },
+        "brand": {
+            "type": "string",
+            "index": "not_analyzed"
+        },
+        "brandName": {
+            "type": "string",
+            "analyzer": "modastylz_english"
+        },
+        "category": {
+            "type": "string",
+            "analyzer": "modastylz_english"
+        },
+        "cluster": {
+            "type": "long"
+        },
+        "color": {
+            "type": "string",
+            "analyzer": "modastylz_english"
+        },
+        "desc": {
+            "type": "string",
+            "analyzer": "modastylz_english"
+        },
+        "gender": {
+            "type": "long"
+        },
+        "id": {
+            "type": "string",
+            "index": "not_analyzed"
+        },
+        "importedDate": {
+            "type": "long"
+        },
+        "importedId": {
+            "type": "string",
+            "index": "not_analyzed"
+        },
+        "inStock": {
+            "type": "boolean"
+        },
+        "lastUpdate": {
+            "type": "long"
+        },
+        "lastUpdated": {
+            "type": "long"
+        },
+        "matchCategory": {
+            "type": "string",
+            "analyzer": "modastylz_english"
+        },
+        "matchable": {
+            "type": "boolean"
+        },
+        "name": {
+            "type": "string",
+            "analyzer": "modastylz_english"
+        },
+        "nextCluster": {
+            "type": "long"
+        },
+        "onSale": {
+            "type": "boolean"
+        },
+        "originalImages": {
+            "type": "string",
+            "index": "not_analyzed"
+        },
+        "preCluster": {
+            "type": "long"
+        },
+        "price": {
+            "type": "double"
+        },
+        "productFlg": {
+            "type": "string",
+            "index": "not_analyzed"
+        },
+        "searchKeyWord": {
+            "type": "string",
+            "analyzer": "modastylz_english"
+        },
+        "size": {
+            "type": "string",
+            "index": "not_analyzed"
+        },
+        "sku": {
+            "type": "string",
+            "index": "not_analyzed"
+        },
+        "store": {
+            "type": "string",
+            "analyzer":"keyword"
+        },
+        "subCategory": {
+            "type": "string",
+            "analyzer": "modastylz_english"
+        },
+        "topCategory": {
+            "type": "string",
+            "analyzer": "modastylz_english"
+        },
+        "tryNow": {
+            "type": "boolean"
+        },
+        "url": {
+            "type": "string",
+            "index": "not_analyzed"
+        },
+        "suggestName" : {
+            "type": "string",
+            "analyzer": "case_insensitive"
+         },
+        "status" : {
+            "type": "integer"
+         },
+         "statusReason" : {
+            "type": "string",
+            "index": "not_analyzed"
+         },
+        "features": {
+            "type": "string",
+            "term_vector": "with_positions_offsets_payloads",
+            "analyzer" : "payload_analyzer"
+        }
+    }
+}
