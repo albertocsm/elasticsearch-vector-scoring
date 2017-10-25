@@ -14,18 +14,14 @@
 
 package com.github.mlnick.elasticsearch.script;
 
+import org.apache.log4j.Logger;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.script.AbstractSearchScript;
 import org.elasticsearch.script.ExecutableScript;
 import org.elasticsearch.script.NativeScriptFactory;
 import org.elasticsearch.script.ScriptException;
-import org.elasticsearch.search.lookup.IndexField;
-import org.elasticsearch.search.lookup.IndexFieldTerm;
-import org.elasticsearch.search.lookup.IndexLookup;
-import org.elasticsearch.search.lookup.TermPosition;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -35,18 +31,15 @@ import java.util.Map;
  */
 public class PayloadVectorScoreScript extends AbstractSearchScript {
 
-    // the field containing the vectors to be scored against
-    String field = null;
-    // indices for the query vector
-    List<String> index = null;
-    // vector for the query vector
-    List<Double> queryVector = null;
-    // whether to score cosine similarity (true) or dot product (false)
-    boolean cosine = false;
-    double queryVectorNorm = 0;
-    float queryVectorAvg = 0;
+    private static final Logger log = Logger.getLogger(PayloadVectorScoreScript.class);
+    public static final String SCRIPT_NAME = "payload_vector_score";
 
-    final static public String SCRIPT_NAME = "payload_vector_score";
+    private String field = null;
+    private List<Double> queryVector = null;
+    private boolean cosine = false;
+    private double queryVectorNorm = 0;
+    private float queryVectorAvg = 0;
+
 
     /**
      * Factory that is registered in
@@ -96,14 +89,6 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
         if (field == null || queryVector == null) {
             throw new ScriptException("cannot initialize " + SCRIPT_NAME + ": field or vector parameter missing!");
         }
-        // init index
-        index = new ArrayList<>(queryVector.size());
-        for (int i = 0; i < queryVector.size(); i++) {
-            index.add(String.valueOf(i));
-        }
-        if (queryVector.size() != index.size()) {
-            throw new ScriptException("cannot initialize " + SCRIPT_NAME + ": index and vector array must have same length!");
-        }
 
         float queryVectorTotal = 0f;
         for (double v : queryVector) {
@@ -111,7 +96,6 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
         }
         queryVectorAvg = queryVectorTotal / queryVector.size();
 
-        // compute query vector norm once
         for (double v : queryVector) {
             queryVectorNorm += Math.pow(v - queryVectorAvg, 2.0);
         }
@@ -120,38 +104,37 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
 
     @Override
     public Object run() {
-        
-        IndexField indexField = this.indexLookup().get(field);
-        List<Float> docVector = new ArrayList<>();
-        // first, get the ShardTerms object for the field.
-        for (int i = 0; i < index.size(); i++) {
-            IndexFieldTerm indexTermField = indexField.get(index.get(i), IndexLookup.FLAG_PAYLOADS);
-            if (indexTermField != null) {
-                Iterator<TermPosition> iter = indexTermField.iterator();
-                if (iter.hasNext()) {
-                    docVector.add(iter.next().payloadAsFloat(0f));
-                }
-            }
-        }
 
-        if (docVector.isEmpty()) {
+        String features = (String) source().get(field);
+        if (features == null || features.isEmpty()) {
+
+            log.warn("Document does not have features");
             return 0f;
         }
 
-        if (docVector.size() != index.size()) {
+        List<Double> docVector = convertFeaturesToList(features);
+        if (docVector == null || docVector.isEmpty()) {
+
+            log.warn("Document does not have features");
             return 0f;
         }
 
-        float docVectorAvg = 0f;
-        for (int i = 0; i < index.size(); i++) {
-            docVectorAvg += docVector.get(i);
+        if (docVector.size() != queryVector.size()) {
+
+            log.error("DocVector and Query vectors sizes are not the same!!!");
+            return 0f;
+        }
+
+        Double docVectorAvg = 0D;
+        for (Double value : docVector) {
+            docVectorAvg += value;
         }
         docVectorAvg /= docVector.size();
 
-        float docVectorValue;
-        float dotProduct = 0;
-        double docVectorNorm = 0.0f;
-        for (int i = 0; i < index.size(); i++) {
+        Double docVectorValue;
+        Double dotProduct = 0D;
+        Double docVectorNorm = 0.0D;
+        for (int i = 0; i < queryVector.size(); i++) {
             docVectorValue = docVector.get(i) - docVectorAvg;
             docVectorNorm += Math.pow(docVectorValue, 2.0);
 
@@ -168,5 +151,21 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
             return dotProduct / (Math.sqrt(docVectorNorm) * Math.sqrt(queryVectorNorm));
         }
     }
+
+    private List<Double> convertFeaturesToList(String features) {
+
+        if (features == null || features.isEmpty()) {
+            return null;
+        }
+
+        List<Double> list = new ArrayList<>();
+        for (String out : features.split(" ")) {
+            Double featureVal = Double.parseDouble(out.split("\\|")[1]);
+            list.add(featureVal);
+        }
+
+        return list;
+    }
+
 
 }

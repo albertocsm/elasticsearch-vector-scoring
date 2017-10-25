@@ -52,7 +52,6 @@ import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertNoFa
  */
 public class PayloadVectorScoreScriptTest extends AbstractSearchScriptTestCase {
 
-    private static final Logger log = Logger.getLogger(ElasticsearchClient.class);
     public static final ObjectMapper jsonMapper;
     private static final InputStream PRODUCT_MAPPING = ElasticsearchClient.class.getResourceAsStream("/product_mapping.json");
     private static final InputStream INDEX_SETTINGS = ElasticsearchClient.class.getResourceAsStream("/settings.json");
