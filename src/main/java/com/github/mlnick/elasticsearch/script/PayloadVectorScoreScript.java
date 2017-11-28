@@ -33,13 +33,9 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
 
     private static final Logger log = Logger.getLogger(PayloadVectorScoreScript.class);
     public static final String SCRIPT_NAME = "payload_vector_score";
-
     private String field = null;
     private List<Double> queryVector = null;
-    private boolean cosine = false;
     private double queryVectorNorm = 0;
-    private float queryVectorAvg = 0;
-
 
     /**
      * Factory that is registered in
@@ -50,7 +46,7 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
 
         /**
          * This method is called for every search on every shard.
-         * 
+         *
          * @param params
          *            list of script parameters passed with the query
          * @return new native script
@@ -81,23 +77,12 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
         field = (String) params.get("field");
         // get query vector
         queryVector = (List<Double>) params.get("vector");
-        // cosine flag
-        Object cosineParam = params.get("cosine");
-        if (cosineParam != null) {
-            cosine = (boolean) cosineParam;
-        }
         if (field == null || queryVector == null) {
             throw new ScriptException("cannot initialize " + SCRIPT_NAME + ": field or vector parameter missing!");
         }
 
-        float queryVectorTotal = 0f;
         for (double v : queryVector) {
-            queryVectorTotal += v;
-        }
-        queryVectorAvg = queryVectorTotal / queryVector.size();
-
-        for (double v : queryVector) {
-            queryVectorNorm += Math.pow(v - queryVectorAvg, 2.0);
+            queryVectorNorm += Math.pow(v, 2.0);
         }
 
     }
@@ -125,21 +110,15 @@ public class PayloadVectorScoreScript extends AbstractSearchScript {
             return 0f;
         }
 
-        Double docVectorAvg = 0D;
-        for (Double value : docVector) {
-            docVectorAvg += value;
-        }
-        docVectorAvg /= docVector.size();
-
         Double docVectorValue;
         Double dotProduct = 0D;
         Double docVectorNorm = 0.0D;
         for (int i = 0; i < queryVector.size(); i++) {
-            docVectorValue = docVector.get(i) - docVectorAvg;
-            docVectorNorm += Math.pow(docVectorValue, 2.0);
+
+            docVectorNorm += Math.pow(docVector.get(i), 2.0);
 
             // dot product
-            dotProduct += docVectorValue * (queryVector.get(i) - queryVectorAvg);
+            dotProduct += docVector.get(i) * queryVector.get(i);
         }
 
         // cosine similarity score
